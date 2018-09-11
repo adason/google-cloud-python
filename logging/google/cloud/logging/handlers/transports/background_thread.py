@@ -263,7 +263,7 @@ class _Worker(object):
                         Specify the trace parameter if span_id is set.
         """
         self._queue.put_nowait({
-            'info': info,
+            'info': self.process_info(record, message),
             'severity': record.levelname,
             'resource': resource,
             'labels': labels,

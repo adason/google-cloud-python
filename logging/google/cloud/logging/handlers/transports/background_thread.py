@@ -37,6 +37,15 @@ _WORKER_THREAD_NAME = 'google.cloud.logging.Worker'
 _WORKER_TERMINATOR = object()
 _LOGGER = logging.getLogger(__name__)
 
+# LogRecord attributes should not be handled separately
+# http://docs.python.org/library/logging.html#logrecord-attributes
+LOGRECORD_ATTRS = (
+    'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
+    'funcName', 'levelname', 'levelno', 'lineno', 'module',
+    'msecs', 'message', 'msg', 'name', 'pathname', 'process',
+    'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName'
+)
+
 
 def _get_many(queue_, max_items=None, max_latency=0):
     """Get multiple items from a Queue.
@@ -254,10 +263,7 @@ class _Worker(object):
                         Specify the trace parameter if span_id is set.
         """
         self._queue.put_nowait({
-            'info': {
-                'message': message,
-                'python_logger': record.name,
-            },
+            'info': info,
             'severity': record.levelname,
             'resource': resource,
             'labels': labels,
@@ -268,6 +274,28 @@ class _Worker(object):
     def flush(self):
         """Submit any pending log records."""
         self._queue.join()
+
+    def process_info(self, record, message):
+        """Process info to dict prior to transport.
+
+        Extra fields in record will be added as well.
+
+        :type record: :class:`logging.LogRecord`
+        :param record: Python log record that the handler was called with.
+
+        :type message: str
+        :param message: The message from the ``LogRecord`` after being
+                        formatted by the associated log formatters.
+        """
+        info = {
+            'message': message,
+            'python_logger': record.name,
+        }
+        for key, value in record.__dict__.items():
+            if key not in LOGRECORD_ATTRS:
+                info[key] = value
+
+        return info
 
 
 class BackgroundThreadTransport(Transport):
